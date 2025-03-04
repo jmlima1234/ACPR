@@ -69,36 +69,77 @@ def load_and_preprocess_images(data_dir, img_size, save_path='preprocessed_data.
     return X, y
 
 # Define a simplified CNN
-class SimpleCNN(nn.Module):
-    def __init__(self):
-        super(SimpleCNN, self).__init__()
-        # Simplified architecture
-        self.conv_layers = nn.Sequential(
-            # First convolutional block
-            nn.Conv2d(3, 16, kernel_size=3, padding=1),
-            nn.ReLU(),
-            nn.MaxPool2d(2),
-            
-            # Second convolutional block
-            nn.Conv2d(16, 32, kernel_size=3, padding=1),
-            nn.ReLU(),
-            nn.MaxPool2d(2)
+class ComplexCNN(nn.Module):
+    def __init__(self, num_classes=4):
+        super(ComplexCNN, self).__init__()
+
+        self.features = nn.Sequential(
+            # The number of filters (output channels) increases in each subsequent convolutional block (32 -> 64 -> 128 ->256).  This allows the network to learn increasingly complex and abstract features.
+
+            # Block 1: Increase depth, add Batch Norm and Dropout
+            nn.Conv2d(3, 32, kernel_size=3, padding=1),
+            nn.BatchNorm2d(32),  # Batch Normalization
+            nn.ReLU(inplace=True),
+            nn.Conv2d(32, 32, kernel_size=3, padding=1),
+            nn.BatchNorm2d(32),
+            nn.ReLU(inplace=True),
+            nn.MaxPool2d(kernel_size=2, stride=2),
+            nn.Dropout2d(0.25),  # Dropout
+
+            # Block 2:  Increase depth further, add Batch Norm and Dropout
+            nn.Conv2d(32, 64, kernel_size=3, padding=1),
+            nn.BatchNorm2d(64),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(64, 64, kernel_size=3, padding=1),
+            nn.BatchNorm2d(64),
+            nn.ReLU(inplace=True),
+            nn.MaxPool2d(kernel_size=2, stride=2),
+            nn.Dropout2d(0.28),
+
+            # Block 3:  Increase depth and complexity, add Batch Norm and Dropout
+            nn.Conv2d(64, 128, kernel_size=3, padding=1),
+            nn.BatchNorm2d(128),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(128, 128, kernel_size=3, padding=1),
+            nn.BatchNorm2d(128),
+            nn.ReLU(inplace=True),
+            nn.MaxPool2d(kernel_size=2, stride=2),
+            nn.Dropout2d(0.3), # Increased dropout slightly
+
+             # Block 4:  Further Increase Depth
+            nn.Conv2d(128, 256, kernel_size=3, padding=1),
+            nn.BatchNorm2d(256),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(256, 256, kernel_size=3, padding=1),
+            nn.BatchNorm2d(256),
+            nn.ReLU(inplace=True),
+            nn.MaxPool2d(kernel_size=2, stride=2),
+            nn.Dropout2d(0.32), # Increased dropout slightly
         )
-        
-        # Fully connected layer - calculate input size properly
-        # After two 2x2 max pools on 64x64 input: 64/2/2 = 16
-        self.fc_layers = nn.Sequential(
+
+        # Calculate the correct input size for the fully connected layers.
+        # With 64x64 input and four 2x2 max pooling operations:
+        # 64 / 2 / 2 / 2 / 2 = 4
+        self.classifier = nn.Sequential(
+            # The classifier part of the network now has two fully connected layers (nn.Linear) instead of one.  
+            # This increases the model's capacity to learn non-linear relationships between the features extracted by the convolutional layers and the output classes.  
+            # Batch normalization and dropout are also applied to the fully connected layers.
             nn.Flatten(),
-            nn.Linear(32 * 16 * 16, 128),
-            nn.ReLU(),
-            nn.Linear(128, 4)  # 4 output classes
+            nn.Linear(256 * 4 * 4, 1024),  # Increased hidden units
+            nn.BatchNorm1d(1024), # Batch Normalization for 1D layers
+            nn.ReLU(inplace=True),
+            nn.Dropout(0.5),  # Dropout for fully connected layers
+            nn.Linear(1024, 512), # Added another fully connected layer
+            nn.BatchNorm1d(512),
+            nn.ReLU(inplace = True),
+            nn.Dropout(0.5),
+            nn.Linear(512, num_classes),  # Output layer
         )
 
     def forward(self, x):
-        x = self.conv_layers(x)
-        x = self.fc_layers(x)
+        x = self.features(x)
+        x = self.classifier(x)
         return x
-
 # Main pipeline
 if __name__ == "__main__":
     print("\n--- Starting Image Classification Pipeline ---")
@@ -132,13 +173,17 @@ if __name__ == "__main__":
         test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
 
         # Initialize model, loss function, and optimizer
-        model = SimpleCNN().to(device)
+        # Added weight decay to the Adam optimizer. 
+        # This adds a small penalty to the loss function based on the magnitude of the network's weights. 
+        # This is another form of regularization that helps prevent overfitting.
+        model = ComplexCNN().to(device)
         criterion = nn.CrossEntropyLoss()
-        optimizer = optim.Adam(model.parameters(), lr=0.001)
+        optimizer = optim.Adam(model.parameters(), lr=0.001, weight_decay=1e-5)
+        # scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min', patience=2, factor=0.1, verbose=True) # Add this line
         print(model)
 
         # Training loop
-        epochs = 5
+        epochs = 20
         print("\n--- Starting Training ---")
         for epoch in range(epochs):
             model.train()
