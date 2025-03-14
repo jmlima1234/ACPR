@@ -6,18 +6,20 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader, TensorDataset
+import pandas as pd
+from collections import Counter
 
 # Check if CUDA is available with PyTorch
 print("Checking for available hardware...")
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 print('Using device:', device)
-
 if device.type == 'cuda':
     print(f"CUDA Device: {torch.cuda.get_device_name(0)}")
     print(f"CUDA Memory: {torch.cuda.get_device_properties(0).total_memory / 1e9:.2f} GB")
 else:
     print("No GPU found, using CPU instead")
 
+# Loading of the images and preprocessing
 def load_and_preprocess_images(data_dir, img_size, save_path='preprocessed_data.npz'):
     """
     Loads and preprocesses images from the specified directory.
@@ -61,6 +63,9 @@ def load_and_preprocess_images(data_dir, img_size, save_path='preprocessed_data.
     # Convert to numpy arrays
     X = np.array(X)
     y = np.array(y)
+    
+    print(X)
+    print(y)
     
     # Save preprocessed data
     print(f"Saving preprocessed data to {save_path}...")
@@ -154,6 +159,39 @@ if __name__ == "__main__":
         # Split the data
         print("\nSplitting data into training and testing sets (80/20)...")
         X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+        # Visualize class distribution for training and test sets
+        import matplotlib.pyplot as plt
+
+        # Count instances of each class
+        train_counts = Counter(y_train)
+        test_counts = Counter(y_test)
+
+        # Create a DataFrame for easier plotting
+        class_names = ['wiki', 'inpainting', 'insight', 'text2img']
+        df_counts = pd.DataFrame({
+            'Training Set': [train_counts.get(i, 0) for i in range(4)],
+            'Testing Set': [test_counts.get(i, 0) for i in range(4)]
+        }, index=class_names)
+
+        # Create the plot
+        plt.figure(figsize=(10, 6))
+        df_counts.plot(kind='bar', ax=plt.gca())
+
+        plt.title('Class Distribution in Training and Testing Sets')
+        plt.ylabel('Number of Images')
+        plt.xlabel('Class')
+        plt.xticks(rotation=45)
+        plt.grid(axis='y', linestyle='--', alpha=0.7)
+        plt.tight_layout()
+        plt.savefig('class_distribution.png')
+        plt.show()
+
+        print("\nClass distribution:")
+        for i, name in enumerate(class_names):
+            print(f"  {name}: {train_counts.get(i, 0)} training samples, {test_counts.get(i, 0)} testing samples")
+        
+        
+        
         print(f"Training set size: {len(X_train)} images")
         print(f"Testing set size: {len(X_test)} images")
 
@@ -165,94 +203,94 @@ if __name__ == "__main__":
         y_test = torch.from_numpy(y_test).long()
         print(f"Training data shape: {X_train.shape}")
 
-        # Create DataLoaders
-        batch_size = 32
-        train_dataset = TensorDataset(X_train, y_train)
-        test_dataset = TensorDataset(X_test, y_test)
-        train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
-        test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
+    #     # Create DataLoaders
+    #     batch_size = 32
+    #     train_dataset = TensorDataset(X_train, y_train)
+    #     test_dataset = TensorDataset(X_test, y_test)
+    #     train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+    #     test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
 
-        # Initialize model, loss function, and optimizer
-        # Added weight decay to the Adam optimizer. 
-        # This adds a small penalty to the loss function based on the magnitude of the network's weights. 
-        # This is another form of regularization that helps prevent overfitting.
-        model = ComplexCNN().to(device)
-        criterion = nn.CrossEntropyLoss()
-        optimizer = optim.Adam(model.parameters(), lr=0.001, weight_decay=1e-5)
-        # scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min', patience=2, factor=0.1, verbose=True) # Add this line
-        print(model)
+    #     # Initialize model, loss function, and optimizer
+    #     # Added weight decay to the Adam optimizer. 
+    #     # This adds a small penalty to the loss function based on the magnitude of the network's weights. 
+    #     # This is another form of regularization that helps prevent overfitting.
+    #     model = ComplexCNN().to(device)
+    #     criterion = nn.CrossEntropyLoss()
+    #     optimizer = optim.Adam(model.parameters(), lr=0.001, weight_decay=1e-5)
+    #     # scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min', patience=2, factor=0.1, verbose=True) # Add this line
+    #     print(model)
 
-        # Training loop
-        epochs = 20
-        print("\n--- Starting Training ---")
-        for epoch in range(epochs):
-            model.train()
-            running_loss = 0.0
-            correct = 0
-            total = 0
+    #     # Training loop
+    #     epochs = 20
+    #     print("\n--- Starting Training ---")
+    #     for epoch in range(epochs):
+    #         model.train()
+    #         running_loss = 0.0
+    #         correct = 0
+    #         total = 0
             
-            for i, (inputs, labels) in enumerate(train_loader):
-                inputs, labels = inputs.to(device), labels.to(device)
+    #         for i, (inputs, labels) in enumerate(train_loader):
+    #             inputs, labels = inputs.to(device), labels.to(device)
                 
-                # Zero gradients
-                optimizer.zero_grad()
+    #             # Zero gradients
+    #             optimizer.zero_grad()
                 
-                # Forward pass
-                outputs = model(inputs)
-                loss = criterion(outputs, labels)
+    #             # Forward pass
+    #             outputs = model(inputs)
+    #             loss = criterion(outputs, labels)
                 
-                # Backward pass and optimize
-                loss.backward()
-                optimizer.step()
+    #             # Backward pass and optimize
+    #             loss.backward()
+    #             optimizer.step()
                 
-                running_loss += loss.item()
+    #             running_loss += loss.item()
                 
-                # Calculate accuracy
-                _, predicted = torch.max(outputs.data, 1)
-                total += labels.size(0)
-                correct += (predicted == labels).sum().item()
+    #             # Calculate accuracy
+    #             _, predicted = torch.max(outputs.data, 1)
+    #             total += labels.size(0)
+    #             correct += (predicted == labels).sum().item()
                 
-                if (i+1) % 10 == 0:
-                    print(f'  Epoch {epoch+1}, Batch {i+1}/{len(train_loader)}, Loss: {loss.item():.4f}')
+    #             if (i+1) % 10 == 0:
+    #                 print(f'  Epoch {epoch+1}, Batch {i+1}/{len(train_loader)}, Loss: {loss.item():.4f}')
             
-            epoch_acc = 100 * correct / total
-            print(f'  Epoch {epoch+1} completed - Accuracy: {epoch_acc:.2f}%')
+    #         epoch_acc = 100 * correct / total
+    #         print(f'  Epoch {epoch+1} completed - Accuracy: {epoch_acc:.2f}%')
 
-        # Evaluation
-        print("\n--- Starting Evaluation ---")
-        model.eval()
-        class_correct = [0] * 4
-        class_total = [0] * 4
-        class_names = ['wiki', 'inpainting', 'insight', 'text2img']
+    #     # Evaluation
+    #     print("\n--- Starting Evaluation ---")
+    #     model.eval()
+    #     class_correct = [0] * 4
+    #     class_total = [0] * 4
+    #     class_names = ['wiki', 'inpainting', 'insight', 'text2img']
         
-        with torch.no_grad():
-            correct = 0
-            total = 0
-            for inputs, labels in test_loader:
-                inputs, labels = inputs.to(device), labels.to(device)
-                outputs = model(inputs)
-                _, predicted = torch.max(outputs.data, 1)
-                total += labels.size(0)
-                correct += (predicted == labels).sum().item()
+    #     with torch.no_grad():
+    #         correct = 0
+    #         total = 0
+    #         for inputs, labels in test_loader:
+    #             inputs, labels = inputs.to(device), labels.to(device)
+    #             outputs = model(inputs)
+    #             _, predicted = torch.max(outputs.data, 1)
+    #             total += labels.size(0)
+    #             correct += (predicted == labels).sum().item()
                 
-                # Per-class accuracy
-                for i in range(len(labels)):
-                    label = labels[i].item()
-                    class_correct[label] += (predicted[i] == label).item()
-                    class_total[label] += 1
+    #             # Per-class accuracy
+    #             for i in range(len(labels)):
+    #                 label = labels[i].item()
+    #                 class_correct[label] += (predicted[i] == label).item()
+    #                 class_total[label] += 1
 
-        accuracy = 100 * correct / total
-        print(f'Overall test accuracy: {accuracy:.2f}%')
+    #     accuracy = 100 * correct / total
+    #     print(f'Overall test accuracy: {accuracy:.2f}%')
 
-        print("\nPer-class accuracy:")
-        for i in range(4):
-            if class_total[i] > 0:
-                class_acc = 100 * class_correct[i] / class_total[i]
-                print(f"  {class_names[i]}: {class_acc:.2f}%")
-            else:
-                print(f"  {class_names[i]}: N/A (no test samples)")
+    #     print("\nPer-class accuracy:")
+    #     for i in range(4):
+    #         if class_total[i] > 0:
+    #             class_acc = 100 * class_correct[i] / class_total[i]
+    #             print(f"  {class_names[i]}: {class_acc:.2f}%")
+    #         else:
+    #             print(f"  {class_names[i]}: N/A (no test samples)")
 
-        print("\n--- Classification Complete ---")
+    #     print("\n--- Classification Complete ---")
         
     except Exception as e:
         print(f"Error in classification pipeline: {str(e)}")
