@@ -1,4 +1,5 @@
 /data/*
+/normalizedData/*
 /vscode
 *.npz
 *.npy
